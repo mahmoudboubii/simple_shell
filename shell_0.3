@@ -1,0 +1,59 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+
+#define BUFFER_SIZE 1024
+#define PATH_MAX 1024
+
+int main(void) {
+    char command[BUFFER_SIZE];
+    char path[PATH_MAX];
+    char *token;
+
+    while (1) {
+        printf(":) ");
+        if (fgets(command, BUFFER_SIZE, stdin) == NULL) {
+            printf("\n");
+            break;
+        }
+
+        // Remove the trailing newline character
+        command[strcspn(command, "\n")] = '\0';
+
+        // Check if command exists in PATH
+        int command_found = 0;
+        token = strtok(getenv("PATH"), ":");
+        while (token != NULL) {
+            snprintf(path, PATH_MAX, "%s/%s", token, command);
+            if (access(path, X_OK) == 0) {
+                command_found = 1;
+                break;
+            }
+            token = strtok(NULL, ":");
+        }
+
+        if (command_found) {
+            pid_t pid = fork();
+            if (pid == -1) {
+                perror("Fork error");
+                exit(EXIT_FAILURE);
+            } else if (pid == 0) {
+                // Child process
+                if (execve(path, NULL, NULL) == -1) {
+                    perror("Execve error");
+                    exit(EXIT_FAILURE);
+                }
+            } else {
+                // Parent process
+                wait(NULL);
+            }
+        } else {
+            printf("%s: command not found\n", command);
+        }
+    }
+
+    return EXIT_SUCCESS;
+}
